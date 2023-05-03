@@ -31,6 +31,7 @@ const render_zone = exports._render_zone = (zone_name, zone, anchor, global_key,
     // algorithm prep
 
     const points = {}
+    let points_of_col = {}
     const rotations = []
     const zone_anchor = anchor.clone()
     // transferring the anchor rotation to "real" rotations
@@ -175,7 +176,7 @@ const render_zone = exports._render_zone = (zone_name, zone, anchor, global_key,
 
             // save new key
             point.meta = key
-            points[key.name] = point
+            points_of_col[key.name] = point
 
             // collect minmax stats for autobind
             col_minmax[col_name].min = Math.min(col_minmax[col_name].min, point.y)
@@ -185,6 +186,12 @@ const render_zone = exports._render_zone = (zone_name, zone, anchor, global_key,
             running_anchor = point.clone()
             running_anchor.shift([0, key.padding])
         }
+
+        const reversedKeys = Object.keys(points_of_col).reverse()
+        for (const key of reversedKeys) {
+          points[key] = points_of_col[key]
+        }
+        points_of_col = {}
 
         first_col = false
     }
@@ -205,7 +212,7 @@ const render_zone = exports._render_zone = (zone_name, zone, anchor, global_key,
             if (bind[0] == -1) {
                 if (point.y < bounds.max) bind[0] = autobind
                 else bind[0] = 0
-                
+
             }
 
             // right
@@ -307,7 +314,7 @@ exports.parse = (config, units) => {
 
         // adjusting new points
         for (const [new_name, new_point] of Object.entries(new_points)) {
-            
+
             // issuing a warning for duplicate keys
             if (Object.keys(points).includes(new_name)) {
                 throw new Error(`Key "${new_name}" defined more than once!`)
@@ -325,13 +332,23 @@ exports.parse = (config, units) => {
         // per-zone mirroring for the new keys
         const axis = parse_axis(mirror, `points.zones.${zone_name}.mirror`, points, units)
         if (axis !== undefined) {
-            const mirrored_points = {}
+            let mirrored_points = {}
+            let points_of_col = {}
+            let cur_col_name = ""
             for (const new_point of Object.values(new_points)) {
+                const col_name = new_point.meta.col.name
+                if (col_name != cur_col_name) {
+                  cur_col_name = col_name
+                  mirrored_points = {...points_of_col, ...mirrored_points}
+                  points_of_col = {}
+                }
                 const [mname, mp] = perform_mirror(new_point, axis)
                 if (mp) {
-                    mirrored_points[mname] = mp
+                  points_of_col[mname] = mp
                 }
             }
+            mirrored_points = {...points_of_col, ...mirrored_points}
+
             points = Object.assign(points, mirrored_points)
         }
     }
